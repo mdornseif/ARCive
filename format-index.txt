@@ -1,0 +1,136 @@
+From http://web.archive.org/web/20011030221650/http://www.alexa.com/company/external_indices.html
+
+External Indices Specification 
+
+Author: Dave Sherfesee
+Date: February 5, 2000
+
+What is an index, why is it necessary, and how is it used?
+
+1. What is an index?
+
+For these purposes an index is a series of records which reference
+data stored in another location. The data in question is that
+contained within the set of archive files, namely, the archived web
+documents. Because the archive files exist for the purpose of
+retrieving site data and requests for this data are based on the URL
+of interest, the logical basis for the index record is the URL
+itself. Thus, the implemented index for the archive data should be a
+series of records, each record including the URL, the location of the
+data corresponding to this URL, and any useful meta data.
+
+2. Why is it necessary?
+
+Is an index necessary? The answer depends on a number of variables:
+(A) the size of the data set, (B) the organizational structure of the
+data set, and (C) the desired performance.
+
+(A) If the data set is very small, it may be faster to traverse it
+directly than to use an index. As the size of the data set grows,
+however, so does the traversal time, and at some critical size, it
+becomes faster to traverse the smaller index, find the location of the
+requested data, and read it directly from the larger data set. For
+very large data sets, such as the internet archive, index traversal
+represents a significant performance increase and it provides the best
+mechanism for data retrieval.
+
+(B) Obviously, data which is well organized can be traversed more
+efficiently than data which is poorly organized. This is why
+relational databases work so well. Unfortunately, these databases
+begin to struggle as the size of the data set grows, and for large
+data sets, a well organized index presents a more efficient
+alternative.
+
+(C) If performance is not an issue, neither the organizational
+structure nor the data retrieval method are important, but this is
+seldom the case.
+
+3. How is it used?
+
+To retrieve the archived data for a site, say www.companyX.com, the
+first step is to locate the index record for www.companyX.com. The
+index itself should be well organized, and since the key to each
+record is the URL, one option is to sort the index by URL. A sorted
+index provides for a number of efficient traversal methods. Once the
+record for www.companyX.com is located, it is read, and the location
+of the archived data determined. The only remaining step is to go to
+that location, read the specified amount of data, and return it as
+output.
+
+An Example
+
+Given the URL records already employed in the archive files, a natural
+choice for the index records is the set of URL records themselves. The
+version 2 URL records contain all of the data necessary for the
+retrieval of the archived pages. The following is an example of an URL
+record in an archive file:
+
+http://www.companyX.com/ 255.255.255.255 20000803200734 text/html 200 ed8e0f40f62c5b36d78729f1a83b2227 - 134841341 file.20000803010304.arc 1394
+
+where the fields in this URL record are described below:
+
+	  
+http://www.companyX.com/	== URL of the archived document
+255.255.255.255			== IP address of the archived document
+20000803200734			== date on which the document was archived, in this case August 3, 2000 at 10:07:34 pm
+text/html			== MIME type of the archived document 
+200				== HTTP response code returned while archiving the document. 
+ed8e0f40f62c5b36d78729f1a83b2227== checksum of the archived document (indicates that this document does not include a redirect to another URL)
+-				== indicates this URL is not a redirect
+134841341			== the offset of this URL record in the archive file.
+file.20000803010304.arc		== name of the archive file in which the archived document resides.
+1394				== length in bytes of the archived document. 
+
+Thus, to retrieve the archived page for http://www.companyX.com/,
+simply locate the URL record in the index beginning with this URL;
+read the file offset (134841341), the file name
+(file.20000803010304.arc), and the content length (1394); and retrieve
+the data. Given this information, retrieving the data is
+straightforward. Simply open the archive file
+(file.20000803010304.arc), skip to the beginning of the URL record
+within the file (in this case 134841341 bytes into the file), and read
+1394 bytes of data (the length of the archived document).
+
+If multiple URL records exist for the same URL, possibly representing
+different versions of the same page archived on different dates, the
+index would then allow for the retrieval of archived documents with
+specific dates. For instance, the URL record above may be followed by
+the following URL record:
+
+http://www.companyX.com/ 255.255.255.255 20000825081056 text/html 200
+c0689e5609cc039e05538643dcf19a51 - 163372 file.20000825081056.arc 1839
+
+The different checksum (c0689e5609cc039e05538643dcf19a51) indicates
+that the content of the document has changed. Now, as this document
+was archived more recently (August 25, 2000 at 8:10:56 am) than the
+previous document, one may add an additiional request parameter. Not
+only can you request the archived document for
+http://www.companyX.com/, you also specify the desired date of the
+document. This should allow one to traverse the entire lifetime of the
+URL.
+
+General Purpose Format
+
+Given that different users may have different applications for an
+index that references a large data set, the index should have an
+extensible format and a common key set. One way to create an
+extensible format is to place a header which describes the format of
+the file in the file itself. This way, applications traversing the
+index can parse the header and handle the data in the index
+accordingly. For instance, if the URL appears in column 1, the IP
+address in column 2, the date in column 3, and the mime type in column
+4, a reasonable header may be:
+
+" INDEX URL IP DATE MIME"
+
+We have chosen to format our headers similarly, describing each
+possible index field with a single unique character. The character's
+location in the header indicates the column in which it is
+located. Since we always sort these files, it is important for the
+first character in the header to be something like a space " " so that
+the header always sorts to the beginning of the file. Additional
+information such as column delimiter or sort order may also be
+included in the header. Ideally, the header should have the same
+structure as the index records themselves and provide sufficient
+information for determining the format of the index.
+
