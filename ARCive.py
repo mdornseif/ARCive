@@ -41,7 +41,7 @@ def  _toARCdate(t):
     return time.strftime('%Y%d%m%H%M%S', time.gmtime(t))
 
 
-class ARCive:
+class ARCive:    
     def __init__(self, file, mode="r", creatorid = defaultcreatorid, creatorip = defaultcreatorip):
         """Open the ARC file with mode read 'r', write 'w' or append 'a'.
 
@@ -57,6 +57,7 @@ class ARCive:
         self.mode = key = mode[0]
         self.creatorid = creatorid
         self.creatorip = creatorip
+        self.debug = 0
 
         if key == 'w':
             if len(mode) == 1:
@@ -118,7 +119,7 @@ class ARCive:
         self.creatorip = m.group('ip')
         self.creationdate = m.group('date')
         self.creatorfilenmame = m.group('filename') 
-        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+)\n$') 
+        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+(; charset=\S+)?) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+)\n$') 
 
     def _read_version_block(self):
         l = self.fd.readline()
@@ -184,19 +185,25 @@ class ARCive:
         self._read_version_block()
         self.dir = {}
         while 1:
-            x = self.readRawDoc(1)
+            # this could be much faster by refraining from reading th body
+            x = self.readRawDoc(donotdecompress=1)
             if x == None:
                 break
             meta = x[0]
             if meta['url'] not in self.dir:
                 self.dir[meta['url']] = []
-            self.dir[meta['url']].append((int(meta['date']), meta['offset']))
+            if self.debug:
+                print meta
+            self.dir[meta['url']].append({"date": meta['date'],
+                                          "offset": meta['offset'],
+                                          "checksum": int(meta['checksum'], 16)})
         # reset file pointer
         self.fd.seek(oldpos)
         return self.dir
 
 
-    def writeRawDoc(self, data, url, mimetype = 'application/octet-stream', result = 200, location = '-'):
+    def writeRawDoc(self, data, url, mimetype = 'application/octet-stream', result = 200,
+                    location = '-', timestamp=None):
         """Write new data to the ARCive.
 
         'data' must be data returned by http containing headers. 'url'
@@ -207,14 +214,19 @@ class ARCive:
         result code. 'location' can be set to the location to where
         the client was redirected when trying to access url."""
 
+        if not timestamp:
+            timestamp = time.time()
         hash = md5.new(data).hexdigest()
         pos = str(self.fd.tell())
         # only in ARCive version 1003 data is compressed using zlib
         if self.version == 1003:
             data = zlib.compress(data)
-        self.fd.write("""\n%s %s %s %s %d %s %s %s %s %s\n""" % (url, self.creatorip, _toARCdate(time.time()), mimetype, result, hash, location, pos, self.filename, len(data)))
+        self.fd.write("\n%s %s %s %s %d %s %s %s %s %s\n" % (url, self.creatorip,
+                                                             _toARCdate(timestamp), mimetype,
+                                                             result, hash, location, pos,
+                                                             self.filename, len(data)))
         self.fd.write(data)
-
+        self.fd.flush()
 
     def readRawDoc(self, donotdecompress = None):
         """Read the next document from the current position.
@@ -238,6 +250,7 @@ class ARCive:
             raise RuntimeError, "Not a valid arc doc header line 2: %r" % l 
         meta = m.groupdict()
         meta['length'] = int(m.group('length'))
+        meta['offset'] = int(m.group('offset'))
         meta['date'] = _fromARCdate(m.group('date'))
         data = self.fd.read(meta['length'])
         # only in ARCive version 1003 data is decompressed using zlib
@@ -247,6 +260,9 @@ class ARCive:
             meta['length'] = len(data)
         return(meta, data)
 
+    def readRawDocAtPos(self, pos, donotdecompress = None):
+        self.fd.seek(pos)
+        return self.readRawDoc(donotdecompress)
         
 if __name__ == '__main__':
     # very simple self-test
