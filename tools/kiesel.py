@@ -68,7 +68,7 @@ if __name__  == '__main__':
 	]
     
     random.shuffle(URLs)
-    ignore_re = re.compile('(http://blogs.23.nu/|http://md.hudora.de/|http://koeln.ccc.de/~drt|http://www.prognosisx.com|http://news.bbc.co.uk|http://www.newsisfree.com/|http://www.vnunet.com|http://www.theregister|http://radio.weblogs.com/0112292|http://radiocomments.userland.com/comments|http://radio.xmlstoragesystem.com/|http://www.google.com|http://127.0.0.1)')
+    ignore_re = re.compile('(http://blogs.23.nu/|http://md.hudora.de/|http://koeln.ccc.de/~drt|http://www.prognosisx.com|http://news.bbc.co.uk|http://www.newsisfree.com/|http://www.vnunet.com|http://www.theregister|http://radio.weblogs.com/0112292|http://radiocomments.userland.com/comments|http://radio.xmlstoragesystem.com/|http://(w)*.google|http://127.0.0.1)')
 
     signal.signal(signal.SIGALRM, ALRMhandler)
     dupes = {}

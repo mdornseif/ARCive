@@ -7,4 +7,6 @@ grep -rh http:// \
 ~/Library/Safari/Bookmarks.plist \
 ~/Library/Mail/Mailboxes/ \
 ~/Library/Application\ Support/NetNewsWire/Cache* \
+~Library/Application\ Support/Firefox/Profiles/*/bookmarks.html \
+~Library/Application\ Support/Firefox/Profiles/*/history.dat \
 | perl -npe 's|http://|\nhttp://|g;s|[ ><"#}]+|\n|g;' | grep http:// | sort -u -r
