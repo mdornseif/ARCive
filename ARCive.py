@@ -3,6 +3,7 @@ import time
 import md5
 import socket
 import os.path
+import zlib
 
 defaultcreatorid = 'ARCive.py'
 defaultcreatorip = '0.0.0.0'
@@ -11,6 +12,7 @@ _version_block1_re = re.compile(r'^filedesc://(?P<path>\S+) (?P<versioninfo>.*) 
 _version_block2_re = re.compile(r'^(?P<versionnumber>\d+) (?P<reserved>.*) (?P<origincode>.+)\n$')
 _versioninfo_v1_re = re.compile(r'^(?P<ip>[0-9.]+) (?P<date>\d+) text/plain$')
 _versioninfo_v2_re = re.compile(r'^(?P<ip>[0-9.]+) (?P<date>\d+) text/plain 200 - - 0 (?P<filename>\S+)$')
+_versioninfo_v1003_re = re.compile(r'^(?P<ip>[0-9.]+) (?P<date>\d+) text/plain 200 - - 0 (?P<filename>\S+)$')
 
 # Used to compare file passed
 import types
@@ -73,6 +75,16 @@ class ARCive:
         self.creatorfilenmame = m.group('filename') 
         self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+)\n$') 
 
+    def _parse_version_block1003(self):
+        """Parse versioninfo for v1003"""
+        m = _versioninfo_v1003_re.match(self.versioninfo)
+        if m == None:
+            raise RuntimeError, "Not a valid v1003 versioninfo header: %r" % self.versioninfo
+        self.creatorip = m.group('ip')
+        self.creationdate = m.group('date')
+        self.creatorfilenmame = m.group('filename') 
+        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+) (?P<orglength\d+)\n$') 
+
     def _read_version_block(self):
         l = self.fd.readline()
         m = _version_block1_re.match(l)
@@ -107,14 +119,28 @@ class ARCive:
     def close(self):
         self.fd.close()
 
+    def getdir(self):
+        self.fd.seek(0)
+        self._read_version_block()
+        self.dir = {}
+        while 1:
+            x = self.readdocraw()
+            if x == None:
+                break
+            meta = x[0]
+            if meta['url'] not in self.dir:
+                self.dir[meta['url']] = []
+            self.dir[meta['url']].append((meta['date'], meta['offset']))
+        return self.dir
+
     def writerawdoc(self, data, url, mimetype = 'application/octet-stream', result = 200, location = '-'):
         hash = md5.new(data).hexdigest()
         pos = str(self.fd.tell())
+        #data = zlib.compress(data)
         self.fd.write("""\n%s %s %s %s %d %s %s %s %s %s\n""" % (url, self.creatorip, _toARCdate(time.time()), mimetype, result, hash, location, pos, self.filename, len(data)))
         self.fd.write(data)
 
     def readdocraw(self):
-        print self.fd.tell()
         l = self.fd.readline()
         if l == '':
             return None
@@ -128,7 +154,6 @@ class ARCive:
         meta['length'] = int(m.group('length'))
         meta['date'] = _fromARCdate(m.group('date'))
         data = self.fd.read(meta['length'])
-        print md5.new(data).hexdigest()
         return(meta, data)
 
 
@@ -139,8 +164,6 @@ if __name__ == '__main__':
     a.writerawdoc('Xtest2X', 'Xurl2X')
     a.writerawdoc('Xtest3X', 'Xurl3X')
     a.close()
-    a = ARCive('testN.arc')
-    print a.readdocraw()
-    print a.readdocraw()
-    print a.readdocraw()
+    a = ARCive('test.arc')
+    print a.getdir()
     
