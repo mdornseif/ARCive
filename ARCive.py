@@ -58,6 +58,7 @@ class ARCive:
         self.creatorid = creatorid
         self.creatorip = creatorip
         self.debug = 0
+       self.size = 0
 
         if key == 'w':
             if len(mode) == 1:
@@ -77,6 +78,7 @@ class ARCive:
 
         if key == 'r':
             self._read_version_block()
+            self.size = os.path.getsize(self.filename)
         elif key == 'w':
             # write a 'dummy' header
             if self.version == 2:
@@ -226,7 +228,8 @@ class ARCive:
                                                              result, hash, location, pos,
                                                              self.filename, len(data)))
         self.fd.write(data)
-        self.fd.flush()
+        #self.fd.flush()
+       self.size = self.fd.tell()
 
     def readRawDoc(self, donotdecompress = None):
         """Read the next document from the current position.
