@@ -13,10 +13,10 @@ urls = []
 
 for x in sys.stdin.readlines():
     urls.append(xmlrpclib.Binary(unicode(x.strip(), 'utf-8', 'replace').encode('ascii', 'replace')))
-    if len(urls) > 1237:
+    if len(urls) > 2345:
         server.submit_new_urls("", urls)
         urls = []
 
-print "last batch", len(urls)
+#print "last batch", len(urls)
 server.submit_new_urls("", urls)
 
