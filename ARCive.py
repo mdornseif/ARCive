@@ -7,11 +7,17 @@ but elsewise is identical to version 2.
 
 TODO: exactly describe version 1003
 
-ARCive can be fpunf at http://c0re.jp/c0de/
+ARCive can be found at http://c0re.jp/c0de/
 
- --drt@un.bewaff.net - http://c0re.23.nu/
+ --Maximillian Dornseif
 
 """
+
+__version__ = '0.1a'
+
+__author = 'Maximillian Dornseif'
+
+__rcsid__ = '$Id:$'
 
 import re
 import time
@@ -58,7 +64,7 @@ class ARCive:
         self.creatorid = creatorid
         self.creatorip = creatorip
         self.debug = 0
-       self.size = 0
+        self.size = 0
 
         if key == 'w':
             if len(mode) == 1:
@@ -86,7 +92,7 @@ class ARCive:
             elif self.version == 1003:
                 self._write_headerv1003()
             else:
-                raise RuntimeError, 'Unknowen ARCive Version'
+                raise RuntimeError, 'Unknown ARCive Version'
         elif key == 'a':
             raise NotImplementedError
         else:
@@ -100,7 +106,7 @@ class ARCive:
             raise RuntimeError, "Not a valid v1 versioninfo header: %r" % self.versioninfo
         self.creatorip = m.group('ip')
         self.creationdate = m.group('date')
-        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+) (?P<length>\d+)\n$') 
+        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+|\S+;\s+\S+) (?P<length>\d+)\n$') 
 
 
     def _parse_version_block2(self):
@@ -111,7 +117,7 @@ class ARCive:
         self.creatorip = m.group('ip')
         self.creationdate = m.group('date')
         self.creatorfilenmame = m.group('filename') 
-        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+)\n$') 
+        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+|\S+;\s+\S+) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+)\n$') 
 
     def _parse_version_block1003(self):
         """Parse versioninfo for v1003"""
@@ -121,7 +127,7 @@ class ARCive:
         self.creatorip = m.group('ip')
         self.creationdate = m.group('date')
         self.creatorfilenmame = m.group('filename') 
-        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+(; charset=\S+)?) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+)\n$') 
+        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+|\S+;\s+\S+?) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+)\n$') 
 
     def _read_version_block(self):
         l = self.fd.readline()
@@ -229,7 +235,7 @@ class ARCive:
                                                              self.filename, len(data)))
         self.fd.write(data)
         #self.fd.flush()
-       self.size = self.fd.tell()
+        self.size = self.fd.tell()
 
     def readRawDoc(self, donotdecompress = None):
         """Read the next document from the current position.
