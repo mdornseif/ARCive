@@ -48,28 +48,31 @@ if __name__  == '__main__':
 	    'http://blogs.23.nu/disLEXia/',
             'http://blogs.23.nu/c0re/',
 	    'http://blogs.23.nu/devconxi/',
-            #'http://blogs.23.nu/netzzensur/',
-            #'http://blogs.23.nu/rade/',
-	    #'http://blogs.23.nu/jurtex/',
-            #'http://blogs.23.nu/inbox/'
-            #'http://blogs.23.nu/dabringhausen/',
-            #'http://blogs.23.nu/datenmuell/',
-            #'http://blogs.23.nu/netzzensur/referrers',
-            #'http://blogs.23.nu/just/',
-            #'http://blogs.23.nu/demagoge/',
-            #'http://blogs.23.nu/cybercrime/referrers',
-            #'http://blogs.23.nu/fsck/',
-            #'http://blogs.23.nu/devconxi/',
-            #'http://blogs.23.nu/RedTeam/',
-            #'http://blogs.23.nu/antlab/',
-            #'http://blogs.23.nu/rezepte/',
-            #'http://blogs.23.nu/moe/',
-            #'http://blogs.23.nu/RunningLAN/',
+            'http://blogs.23.nu/netzzensur/',
+            'http://blogs.23.nu/rade/',
+	    'http://blogs.23.nu/jurtex/',
+            'http://blogs.23.nu/just/',
+            'http://blogs.23.nu/demagoge/',
+            'http://blogs.23.nu/fsck/',
+            'http://blogs.23.nu/devconxi/',
+            'http://blogs.23.nu/RedTeam/',
+            'http://blogs.23.nu/antlab/',
+            'http://blogs.23.nu/rezepte/',
+            'http://blogs.23.nu/moe/',
             'http://blogs.23.nu/disLEXiaDE/',
-            #'http://blogs.23.nu/sevilla/',
-            #'http://blogs.23.nu/lufgi4en/',
             'http://www-i4.informakik.rwth-aachen.de/lufg/', 
-#'http://lufgi4.informatik.rwth-aachen.de/forms/listanswers/1',
+'http://lufgi4.informatik.rwth-aachen.de/courses/show/1/',
+'http://blogs.23.nu/disLEXiaDE/stories/9558/',
+'http://blogs.23.nu/disLEXiaDE/stories/9559/',
+'http://blogs.23.nu/disLEXiaDE/stories/9561/',
+'http://blogs.23.nu/disLEXiaDE/stories/9563/',
+'http://blogs.23.nu/disLEXiaDE/stories/9564/',
+'http://blogs.23.nu/disLEXiaDE/stories/9558',
+'http://blogs.23.nu/disLEXiaDE/stories/9559',
+'http://blogs.23.nu/disLEXiaDE/stories/9561',
+'http://blogs.23.nu/disLEXiaDE/stories/9563',
+'http://blogs.23.nu/disLEXiaDE/stories/9564',
+'http://lufgi4.informatik.rwth-aachen.de/groups/show/3',
 'http://lufgi4.informatik.rwth-aachen.de/',
 'http://lufgi4.informatik.rwth-aachen.de/staff',
 'http://lufgi4.informatik.rwth-aachen.de/news',
@@ -77,7 +80,6 @@ if __name__  == '__main__':
 'http://lufgi4.informatik.rwth-aachen.de/publications',
 'http://lufgi4.informatik.rwth-aachen.de/conferences',
 'http://lufgi4.informatik.rwth-aachen.de/cfps',
-'http://lufgi4.informatik.rwth-aachen.de/calendar',
 	]
     
     random.shuffle(URLs)
@@ -88,6 +90,9 @@ if __name__  == '__main__':
     for URL in URLs:
         print "***", URL
         try:
+	    # first ensure that the internet archive knows about this site
+            urllib.urlopen('http://web.archive.org/web/*/'+URL).read()
+
             f = urllib.urlopen(URL)
 
             p = myParser(URL)
@@ -95,7 +100,7 @@ if __name__  == '__main__':
             p.close()
 
             random.shuffle(p.anchors)
-            print p.anchors
+            # print p.anchors
             for x, foo in p.anchors:
                 if not ignore_re.match(x):
                     if x not in dupes:
@@ -121,51 +126,12 @@ if __name__  == '__main__':
                             time.sleep(random.randrange(3))
                             signal.alarm(0)
 
-                            signal.alarm(60)
-                            (proto, host, path, params, frag) = urlparse.urlsplit(x)
-                            headers = {"Referer": 'http://blogs.23.nu/disLEXiaDE/stories/5890/',
-				       "Accept-Encoding": 'gzip, compress',
-                                       "User-Agent": 'iCab/2.8.1 (Macintosh; I; PPC; Mac OS X; kiesel)'}
-                            conn = httplib.HTTPConnection(host)
-                            #conn.set_debuglevel(9)
-                            if params:
-                                path = path + '?' + params
-                            if frag:
-                                path = path + '#' + frag
-                            conn.request("GET", path, None, headers)
-                            response = conn.getresponse()
-                            #print response.status, response.reason
-                            #data = response.read()
-                            conn.close()
-                            time.sleep(random.randrange(3))
-                            signal.alarm(0)
-
-
-                            signal.alarm(60)
-                            (proto, host, path, params, frag) = urlparse.urlsplit(x)
-                            headers = {"Referer": 'http://sauna.5711.org/~md/thumbnails/',
-				       "Accept-Encoding": 'gzip, compress',
-                                       "User-Agent": 'iCab/2.8.1 (Macintosh; I; PPC; Mac OS X; kiesel)'}
-                            conn = httplib.HTTPConnection(host)
-                            #conn.set_debuglevel(9)
-                            if params:
-                                path = path + '?' + params
-                            if frag:
-                                path = path + '#' + frag
-                            conn.request("GET", path, None, headers)
-                            response = conn.getresponse()
-                            #print response.status, response.reason
-                            #data = response.read()
-                            conn.close()
-                            time.sleep(random.randrange(3))
-                            signal.alarm(0)
-
                         except:
                             print "das war nichts"
                             #raise
         except:
             print "das war nichts"
-            #raise
+            # raise
                 
 
     

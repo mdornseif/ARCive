@@ -13,17 +13,15 @@ ARCive can be found at http://c0re.jp/c0de/
 
 """
 
-__version__ = '0.1a'
+__version__ = '0.1'
 
 __author = 'Maximillian Dornseif'
-
-__rcsid__ = '$Id:$'
 
 import re
 import time
 import md5
 import os.path
-import zlib
+import zlib, gzip, bz2
 
 defaultcreatorid = 'ARCive.py'
 defaultcreatorip = '0.0.0.0'
@@ -48,7 +46,7 @@ def  _toARCdate(t):
 
 
 class ARCive:    
-    def __init__(self, file, mode="r", creatorid = defaultcreatorid, creatorip = defaultcreatorip):
+    def __init__(self, f, mode="r", creatorid = defaultcreatorid, creatorip = defaultcreatorip):
         """Open the ARC file with mode read 'r', write 'w' or append 'a'.
 
         Mode can also contain the desired ARCive version if creating a
@@ -57,6 +55,9 @@ class ARCive:
         is assumed. If file is not an filename it can also be an open
         file-object.  You can also set the 'creatorid' and the
         'creatorip' which are only relevant when writing to an arcive. 
+
+        If f ends in bz2 or gz we do the right thing by
+        by transparently compressing/decompressing the data.
         """
         
         # code partly taken from zipfile.py
@@ -74,13 +75,18 @@ class ARCive:
                 mode = mode[0]
 
         # Check if we were passed a file-like object
-        if type(file) in _STRING_TYPES:
-            self.filename = file
+        if type(f) in _STRING_TYPES:
+            self.filename = f
             modeDict = {'r' : 'rb', 'w': 'wb', 'a' : 'r+b'}
-            self.fd = open(file, modeDict[mode[0]])
+            if f.endswith('.bz2'):
+                self.fd = bz2.BZ2File(f, modeDict[mode[0]])
+            elif f.endswith('.gz'):
+                self.fd = gzip.GzipFile(f, modeDict[mode[0]])
+            else:
+              self.fd = open(f, modeDict[mode[0]])
         else:
-            self.fd = file
-            self.filename = getattr(file, 'name', None)
+            self.fd = f
+            self.filename = getattr(f, 'name', None)
 
         if key == 'r':
             self._read_version_block()
@@ -241,16 +247,18 @@ class ARCive:
         """Read the next document from the current position.
 
         It will return a tuple (meta, data) where 'meta' is a
-        dictionary containing information about the document. Thoe
+        dictionary containing information about the document. The
         only entrys in this dictionary you can rely on are 'length' and
         'date'.
 
-        If donotdecompress is true compressed data wirr returned to
+        if the file has ended ({}, None is returned).
+
+        If donotdecompress is true compressed data will returned to
         the caller in compressed form."""
 
         l = self.fd.readline()
         if l == '':
-            return None
+          return {}, None
         if l != '\n':
             raise RuntimeError, 'invalid doc header line 1: %r' % l 
         l = self.fd.readline()
