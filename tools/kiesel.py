@@ -100,15 +100,6 @@ spider(['http://blogs.23.nu/c0re/',
         'http://technorati.com/blogs/blogs.23.nu/c0re?reactions',
         'http://technorati.com/blogs/blogs.23.nu/disLEXiaDE?reactions',
         'http://www.hudora.de/unternehmen/jobs/freelancing/',
-        #'http://technorati.com/posts/tag/hudora',
-        #'http://search.yahoo.com/search?p=hudora',
-        #'http://search.lycos.com/default.asp?query=hudora',
-        #'http://www.ask.com/web?q=hudora',
-        #'http://www.alltheweb.com/search?cat=web&q=hudora',
-        #'http://www.google.de/products?q=hudora&btnG=Produkte+suchen',
-        #'http://www.altavista.com/web/results?q=hudora',
-        #'http://vivisimo.com/search?query=hudora',
-        #'http://www.a9.com/hudora',
 ])
 
 if __name__  == '__main__S':

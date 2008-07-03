@@ -15,19 +15,27 @@ def createDatabaseFromScratch():
     global dbDir
     dbDir = {}
     for d in datadirs:
+        if not os.path.exists(d):
+            continue
         for basefn in os.listdir(d):
             fn = os.path.join(d, basefn)
-            if os.path.isfile(fn) and fn.endswith(".arc"):
-		arcDir = arcDirGetCacheForDb(d, basefn)
-		if not arcDir:
+            if os.path.isfile(fn) and fn.endswith(".arc.bz2"):
+                print fn
+                start = time.time()
+                arcDir = arcDirGetCacheForDb(d, basefn)
+                if not arcDir:
+                    print "rebuilding cache for %r" % fn
                     a = ARCive(fn, 'r')
                     arcDir = a.getDir()
                     saveCacheForDb(arcDir, d, basefn)
+                print "updating dbdir"
                 for url in arcDir:
                     if url not in dbDir:
                         dbDir[url] = []
                     for x in arcDir[url]:
                         dbDir[url].append((x["checksum"], x["date"], x["offset"], fn))
+                delta = time.time() - start
+                print "dbdirlen=%d, %d urls in %fs, %f url/s" % (len(dbDir), len(arcDir), delta, len(arcDir)/delta)
 
 def saveCacheForDb(arcDir, d, basefn):
     if not os.path.exists(os.path.join(d, ".cache")):
@@ -76,10 +84,18 @@ def getURLs():
     updateMemoryDb()
     return dbDir.keys()
 
+import hotshot, hotshot.stats
 if __name__ == "__main__":
+    prof = hotshot.Profile("ARCdb.prof")
+    prof.runcall(getEntries, "http://blogs.23.nu/")
+    prof.close()
+    stats = hotshot.stats.load("ARCdb.prof")
+    stats.strip_dirs()
+    stats.sort_stats('time', 'calls')
+    stats.print_stats(20)
     pprint(getEntries("http://blogs.23.nu/"))
-    getEntries("http://blogs.23.nu/")
-
+    # getEntries("http://blogs.23.nu/")
+    
     print len(dbDir.keys())
     #pprint(dbDir)
 

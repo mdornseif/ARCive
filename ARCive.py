@@ -1,13 +1,9 @@
 """ This module implements the class ARCive which allows reading and
 writing of archive files like the ones in use at the internet
-archive. Beside the archive format versions 1 and 2 which are defined
-at http://www.alexa.com/company/arcformat.html ARCive.py implements an
-additional version 1003 which stores the documents compressed by zlib
-but elsewise is identical to version 2.
+archive. Archive format versions 1 and 2 are defined at
+http://www.alexa.com/company/arcformat.html.
 
-TODO: exactly describe version 1003
-
-ARCive can be found at http://c0re.jp/c0de/
+ARCive can be found at http://c0re.23.nu/c0de/
 
  --Maximillian Dornseif
 
@@ -17,11 +13,17 @@ __version__ = '0.1'
 
 __author = 'Maximillian Dornseif'
 
+import sys
 import re
 import time
 import md5
 import os.path
 import zlib, gzip, bz2
+
+try:
+    from threading import Lock
+except ImportError:
+    from dummy_threading import Lock
 
 defaultcreatorid = 'ARCive.py'
 defaultcreatorip = '0.0.0.0'
@@ -30,7 +32,6 @@ _version_block1_re = re.compile(r'^filedesc://(?P<path>\S+) (?P<versioninfo>.*) 
 _version_block2_re = re.compile(r'^(?P<versionnumber>\d+) (?P<reserved>.*) (?P<origincode>.+)\n$')
 _versioninfo_v1_re = re.compile(r'^(?P<ip>[0-9.]+) (?P<date>\d+) text/plain$')
 _versioninfo_v2_re = re.compile(r'^(?P<ip>[0-9.]+) (?P<date>\d+) text/plain 200 - - 0 (?P<filename>\S+)$')
-_versioninfo_v1003_re = re.compile(r'^(?P<ip>[0-9.]+) (?P<date>\d+) text/plain 200 - - 0 (?P<filename>\S+)$')
 
 # Used to compare file passed
 import types
@@ -48,14 +49,13 @@ def  _toARCdate(t):
 class ARCive:    
     def __init__(self, f, mode="r", creatorid = defaultcreatorid, creatorip = defaultcreatorip):
         """Open the ARC file with mode read 'r', write 'w' or append 'a'.
-
+        
         Mode can also contain the desired ARCive version if creating a
-        new file. Only '2' and '1003' ars supported. 'w1003' will
-        create a Version 1003 ARCive. If you obmit version, version 2
+        new file. Only '2' is supported. If you obmit version, version 2
         is assumed. If file is not an filename it can also be an open
         file-object.  You can also set the 'creatorid' and the
         'creatorip' which are only relevant when writing to an arcive. 
-
+        
         If f ends in bz2 or gz we do the right thing by
         by transparently compressing/decompressing the data.
         """
@@ -66,7 +66,8 @@ class ARCive:
         self.creatorip = creatorip
         self.debug = 0
         self.size = 0
-
+        self._lock = Lock()
+        
         if key == 'w':
             if len(mode) == 1:
                 self.version = 2
@@ -79,11 +80,11 @@ class ARCive:
             self.filename = f
             modeDict = {'r' : 'rb', 'w': 'wb', 'a' : 'r+b'}
             if f.endswith('.bz2'):
-                self.fd = bz2.BZ2File(f, modeDict[mode[0]])
+                self.fd = bz2.BZ2File(f, modeDict[mode[0]], 2**10)
             elif f.endswith('.gz'):
-                self.fd = gzip.GzipFile(f, modeDict[mode[0]])
+                self.fd = gzip.GzipFile(f, modeDict[mode[0]], 2**10)
             else:
-              self.fd = open(f, modeDict[mode[0]])
+              self.fd = open(f, modeDict[mode[0]], 2**10)
         else:
             self.fd = f
             self.filename = getattr(f, 'name', None)
@@ -95,8 +96,6 @@ class ARCive:
             # write a 'dummy' header
             if self.version == 2:
                 self._write_headerv2()
-            elif self.version == 1003:
-                self._write_headerv1003()
             else:
                 raise RuntimeError, 'Unknown ARCive Version'
         elif key == 'a':
@@ -125,16 +124,6 @@ class ARCive:
         self.creatorfilenmame = m.group('filename') 
         self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+|\S+;\s+\S+) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+)\n$') 
 
-    def _parse_version_block1003(self):
-        """Parse versioninfo for v1003"""
-        m = _versioninfo_v1003_re.match(self.versioninfo)
-        if m == None:
-            raise RuntimeError, "Not a valid v1003 versioninfo header: %r" % self.versioninfo
-        self.creatorip = m.group('ip')
-        self.creationdate = m.group('date')
-        self.creatorfilenmame = m.group('filename') 
-        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+|\S+;\s+\S+?) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+)\n$') 
-
     def _read_version_block(self):
         l = self.fd.readline()
         m = _version_block1_re.match(l)
@@ -156,8 +145,6 @@ class ARCive:
             self._parse_version_block1()
         elif self.version == 2:
             self._parse_version_block2()
-        elif self.version == 1003:
-            self._parse_version_block1003()
         else:
             raise RuntimeError, "unknown arc version: %d" % self.version
 
@@ -166,13 +153,6 @@ class ARCive:
         """Write a ARCive header v2"""
 
         headerrest = "2 0 %s\nURL IP-address Archive-date Content-type Result-code Checksum Location Offset Filename Archive-length\n" % (self.creatorid)
-        self.fd.write("filedesc://%s %s %s text/plain 200 - - 0 %s %d\n%s"  % (os.path.join('', self.filename), self.creatorip, _toARCdate(time.time()), self.filename, len(headerrest), headerrest))
-
-
-    def _write_headerv1003(self):
-        """Write a ARCive header v1003"""
-        
-        headerrest = "1003 0 %s\nURL IP-address Archive-date Content-type Result-code Checksum Location Offset Filename Archive-length\n" % (self.creatorid)
         self.fd.write("filedesc://%s %s %s text/plain 200 - - 0 %s %d\n%s"  % (os.path.join('', self.filename), self.creatorip, _toARCdate(time.time()), self.filename, len(headerrest), headerrest))
 
 
@@ -200,10 +180,9 @@ class ARCive:
         self.dir = {}
         while 1:
             # this could be much faster by refraining from reading th body
-            x = self.readRawDoc(donotdecompress=1)
-            if x == None:
+            meta, data = self.readRawDoc(donotdecompress = True)
+            if not meta:
                 break
-            meta = x[0]
             if meta['url'] not in self.dir:
                 self.dir[meta['url']] = []
             if self.debug:
@@ -231,17 +210,19 @@ class ARCive:
         if not timestamp:
             timestamp = time.time()
         hash = md5.new(data).hexdigest()
-        pos = str(self.fd.tell())
-        # only in ARCive version 1003 data is compressed using zlib
-        if self.version == 1003:
-            data = zlib.compress(data)
-        self.fd.write("\n%s %s %s %s %d %s %s %s %s %s\n" % (url, self.creatorip,
-                                                             _toARCdate(timestamp), mimetype,
-                                                             result, hash, location, pos,
-                                                             self.filename, len(data)))
-        self.fd.write(data)
-        #self.fd.flush()
-        self.size = self.fd.tell()
+
+        self._lock.acquire()
+        try:
+            pos = str(self.fd.tell())
+            self.fd.write("\n%s %s %s %s %d %s %s %s %s %s\n" % (url, self.creatorip,
+                                                                 _toARCdate(timestamp), mimetype,
+                                                                 result, hash, location, pos,
+                                                                 self.filename, len(data)))
+            self.fd.write(data)
+            #self.fd.flush()
+            self.size = self.fd.tell()
+        finally:
+            self._lock.release()
 
     def readRawDoc(self, donotdecompress = None):
         """Read the next document from the current position.
@@ -256,9 +237,25 @@ class ARCive:
         If donotdecompress is true compressed data will returned to
         the caller in compressed form."""
 
+        self._lock.acquire()
+        try:
+            meta = self._read_doc_header()
+            if not meta:
+                # EOF
+                return {}, None
+            if donotdecompress:
+                data = self._read_doc_data_mock(meta['length'])
+            else:
+                data = self._read_doc_data(meta['length'])
+        finally:
+            self._lock.release()
+
+        return(meta, data)
+
+    def _read_doc_header(self):
         l = self.fd.readline()
         if l == '':
-          return {}, None
+          return None
         if l != '\n':
             raise RuntimeError, 'invalid doc header line 1: %r' % l 
         l = self.fd.readline()
@@ -269,23 +266,30 @@ class ARCive:
         meta['length'] = int(m.group('length'))
         meta['offset'] = int(m.group('offset'))
         meta['date'] = _fromARCdate(m.group('date'))
-        data = self.fd.read(meta['length'])
-        # only in ARCive version 1003 data is decompressed using zlib
-        if self.version == 1003 and not donotdecompress:
-            data = zlib.decompress(data)
-            meta['complength'] = meta['length'] 
-            meta['length'] = len(data)
-        return(meta, data)
-
+        return meta
+    
+    def _read_doc_data(self, length):
+        return self.fd.read(length,)
+    
+    def _read_doc_data_mock(self, length):
+        self.fd.seek(length, 1)
+        return None
+    
     def readRawDocAtPos(self, pos, donotdecompress = None):
-        self.fd.seek(pos)
-        return self.readRawDoc(donotdecompress)
-        
+        self._lock.acquire()
+        try:
+            self.fd.seek(pos)
+            ret = self.readRawDoc(donotdecompress)
+        finally:
+            self._lock.release()
+        return ret
+    
+
 if __name__ == '__main__':
     # very simple self-test
 
     print "create a new archive called 'testN.arc' and write some data into it"
-    a = ARCive('testN.arc', 'w1003')
+    a = ARCive('testN.arc', 'w')
     a.writeRawDoc('a test data 1 X', 'http://url1/X')
     a.writeRawDoc('b test data 2 X', 'http://url2/X')
     a.writeRawDoc('c test data 3 X', 'http://url3/X')
