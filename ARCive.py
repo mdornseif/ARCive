@@ -9,7 +9,7 @@ ARCive can be found at http://c0re.23.nu/c0de/
 
 """
 
-__version__ = '0.1'
+__version__ = '0.2'
 
 __author = 'Maximillian Dornseif'
 
@@ -121,21 +121,21 @@ class ARCive:
             raise RuntimeError, "Not a valid v2 versioninfo header: %r" % self.versioninfo
         self.creatorip = m.group('ip')
         self.creationdate = m.group('date')
-        self.creatorfilenmame = m.group('filename') 
-        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+|\S+;\s+\S+) (?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) (?P<length>\d+)\n$') 
+        self.creatorfilenmame = m.group('filename')
+        self.urlrecord_re = re.compile(r'^(?P<url>.+) (?P<archiverip>[0-9.]+) (?P<date>\d+) (?P<contenttype>\S+|\S+;\s+\S+) ((?P<resultcode>\d+) (?P<checksum>.+) (?P<location>.+) (?P<offset>\d+) (?P<filename>.+) )?(?P<length>\d+)\n$') 
 
     def _read_version_block(self):
-        l = self.fd.readline()
-        m = _version_block1_re.match(l)
+        l1 = self.fd.readline()
+        m = _version_block1_re.match(l1)
         if m == None:
-            raise RuntimeError, "Not a valid arc file header line 1: %r" % (l)
+            raise RuntimeError, "Not a valid arc file header line 1: %r" % (l1)
         self.path = m.group('path')
         self.versioninfo = m.group('versioninfo')
         self.path = m.group('length')
-        l = self.fd.readline()
-        m = _version_block2_re.match(l)
+        l2 = self.fd.readline()
+        m = _version_block2_re.match(l2)
         if m == None:
-            raise RuntimeError, "Not a valid arc file header line 2: %r" % (l)
+            raise RuntimeError, "Not a valid arc file header line 2: %r %r %r" % (l1, l2, self.fd.readline())
         self.version = int(m.group('versionnumber'))
         self.reserved = m.group('reserved')
         self.origincode = m.group('origincode')
@@ -147,7 +147,11 @@ class ARCive:
             self._parse_version_block2()
         else:
             raise RuntimeError, "unknown arc version: %d" % self.version
-
+        # read metadata (and throw it away) until we hit a blank line
+        l = self.fd.readline()
+        while l.strip() != '</arcmetadata>':
+            l = self.fd.readline()
+ 
 
     def _write_headerv2(self):
         """Write a ARCive header v2"""
@@ -179,8 +183,8 @@ class ARCive:
         self._read_version_block()
         self.dir = {}
         while 1:
-            # this could be much faster by refraining from reading th body
-            meta, data = self.readRawDoc(donotdecompress = True)
+            # this could be much faster by refraining from reading the body
+            meta, data = self.readRawDoc()
             if not meta:
                 break
             if meta['url'] not in self.dir:
@@ -189,7 +193,7 @@ class ARCive:
                 print meta
             self.dir[meta['url']].append({"date": meta['date'],
                                           "offset": meta['offset'],
-                                          "checksum": int(meta['checksum'], 16)})
+                                          "checksum": int(meta.get('checksum', '0'), 16)})
         # reset file pointer
         self.fd.seek(oldpos)
         return self.dir
@@ -224,7 +228,7 @@ class ARCive:
         finally:
             self._lock.release()
 
-    def readRawDoc(self, donotdecompress = None):
+    def readRawDoc(self):
         """Read the next document from the current position.
 
         It will return a tuple (meta, data) where 'meta' is a
@@ -233,9 +237,7 @@ class ARCive:
         'date'.
 
         if the file has ended ({}, None is returned).
-
-        If donotdecompress is true compressed data will returned to
-        the caller in compressed form."""
+        """
 
         self._lock.acquire()
         try:
@@ -243,43 +245,39 @@ class ARCive:
             if not meta:
                 # EOF
                 return {}, None
-            if donotdecompress:
-                data = self._read_doc_data_mock(meta['length'])
-            else:
-                data = self._read_doc_data(meta['length'])
+            data = self._read_doc_data(meta['length'])
         finally:
             self._lock.release()
 
         return(meta, data)
 
     def _read_doc_header(self):
-        l = self.fd.readline()
-        if l == '':
+        l1 = self.fd.readline()
+        if l1 == '': # EOD
           return None
-        if l != '\n':
-            raise RuntimeError, 'invalid doc header line 1: %r' % l 
-        l = self.fd.readline()
-        m = self.urlrecord_re.match(l)
+        if l1 != '\n':
+            raise RuntimeError, 'invalid doc header line 1: %r' % l1 
+        l2 = self.fd.readline()
+        if l2 == '': # EOF
+            return None
+        m = self.urlrecord_re.match(l2)
         if m == None:
-            raise RuntimeError, "Not a valid arc doc header line 2: %r" % l 
+            raise RuntimeError, "Not a valid arc doc header line 2: %r %r" % (l1, l2) 
+        offset = self.fd.tell()
         meta = m.groupdict()
         meta['length'] = int(m.group('length'))
-        meta['offset'] = int(m.group('offset'))
+        meta['offset'] = offset # int(m.group('offset'))
         meta['date'] = _fromARCdate(m.group('date'))
         return meta
     
     def _read_doc_data(self, length):
         return self.fd.read(length,)
     
-    def _read_doc_data_mock(self, length):
-        self.fd.seek(length, 1)
-        return None
-    
-    def readRawDocAtPos(self, pos, donotdecompress = None):
+    def readRawDocAtPos(self, pos):
         self._lock.acquire()
         try:
             self.fd.seek(pos)
-            ret = self.readRawDoc(donotdecompress)
+            ret = self.readRawDoc()
         finally:
             self._lock.release()
         return ret
